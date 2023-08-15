@@ -13,45 +13,63 @@ dotenv.config();
 
 // Env Vars
 const 
-    OCTO_API_KEY = env.get('OCTO_API_KEY').required().asString(),
-    OCTO_ELECTRIC_SN = env.get('OCTO_ELECTRIC_SN').required().asString(),
-    OCTO_ELECTRIC_MPAN = env.get('OCTO_ELECTRIC_MPAN').required().asString(),
-    OCTO_GAS_MPRN = env.get('OCTO_GAS_MPRN').required().asString(),
-    OCTO_GAS_SN = env.get('OCTO_GAS_SN').required().asString(),
-    OCTO_ELECTRIC_COST = env.get('OCTO_ELECTRIC_COST').required().asString(),
-    OCTO_GAS_COST = env.get('OCTO_GAS_COST').required().asString(),
-    INFLUXDB_URL = env.get('INFLUXDB_URL').required().asString(),
-    INFLUXDB_TOKEN = env.get('INFLUXDB_TOKEN').required().asString(),
-    INFLUXDB_ORG = env.get('INFLUXDB_ORG').required().asString(),
     INFLUXDB_BUCKET = env.get('INFLUXDB_BUCKET').required().asString(),
+    INFLUXDB_ORG = env.get('INFLUXDB_ORG').required().asString(),
+    INFLUXDB_TOKEN = env.get('INFLUXDB_TOKEN').required().asString(),
+    INFLUXDB_URL = env.get('INFLUXDB_URL').required().asString(),
     LOOP_TIME = env.get('LOOP_TIME').required().asString(),
+    OCTO_API_KEY = env.get('OCTO_API_KEY').required().asString(),
     PAGE_SIZE = env.get('PAGE_SIZE').required().asString(),
-    VOLUME_CORRECTION = env.get('VOLUME_CORRECTION').required().asString(),
-    CALORIFIC_VALUE = env.get('CALORIFIC_VALUE').required().asString(),
-    JOULES_CONVERSION= env.get('JOULES_CONVERSION').required().asString()
+
+    OCTO_ELECTRIC_COST = env.get('OCTO_ELECTRIC_COST').asString(),
+    OCTO_ELECTRIC_MPAN = env.get('OCTO_ELECTRIC_MPAN').asString(),
+    OCTO_ELECTRIC_SN = env.get('OCTO_ELECTRIC_SN').asString(),
+
+    CALORIFIC_VALUE = env.get('CALORIFIC_VALUE').asString(),
+    JOULES_CONVERSION= env.get('JOULES_CONVERSION').asString(),
+    OCTO_GAS_COST = env.get('OCTO_GAS_COST').asString(),
+    OCTO_GAS_MPRN = env.get('OCTO_GAS_MPRN').asString(),
+    OCTO_GAS_SN = env.get('OCTO_GAS_SN').asString(),
+    VOLUME_CORRECTION = env.get('VOLUME_CORRECTION').asString()
 
 
 const boot = async (callback) => {
     console.log("Starting Octopus Energy Consumption Metrics Container")
     console.log("Current Settings are:")
     console.log(`
+        INFLUXDB_BUCKET = ${INFLUXDB_BUCKET}
+        INFLUXDB_ORG = ${INFLUXDB_ORG}
+        INFLUXDB_TOKEN = ${INFLUXDB_TOKEN}
+        INFLUXDB_URL = ${INFLUXDB_URL}
+        LOOP_TIME = ${LOOP_TIME}
         OCTO_API_KEY = ${OCTO_API_KEY}
+        PAGE_SIZE = ${PAGE_SIZE}
+    `)
+
+    let processElectric = OCTO_ELECTRIC_MPAN && OCTO_ELECTRIC_SN && OCTO_ELECTRIC_COST
+    if (processElectric) {
+        console.log(`
+        OCTO_ELECTRIC_COST = ${OCTO_ELECTRIC_COST}
         OCTO_ELECTRIC_MPAN = ${OCTO_ELECTRIC_MPAN}
         OCTO_ELECTRIC_SN = ${OCTO_ELECTRIC_SN}
-        OCTO_GAS_MPAN = ${OCTO_GAS_MPRN}
-        OCTO_GAS_SN = ${OCTO_GAS_SN}
-        INFLUXDB_URL = ${INFLUXDB_URL}
-        INFLUXDB_TOKEN = ${INFLUXDB_TOKEN}
-        INFLUXDB_ORG = ${INFLUXDB_ORG}
-        INFLUXDB_BUCKET = ${INFLUXDB_BUCKET}
-        LOOP_TIME = ${LOOP_TIME}
-        OCTO_ELECTRIC_COST = ${OCTO_ELECTRIC_COST}
-        OCTO_GAS_COST = ${OCTO_GAS_COST}
-        PAGE_SIZE = ${PAGE_SIZE}
-        VOLUME_CORRECTION = ${VOLUME_CORRECTION}
+        `)
+    } else {
+        console.log('Skipping processing electric, must set all variables: OCTO_ELECTRIC_MPAN, OCTO_ELECTRIC_SN, OCTO_ELECTRIC_COST')
+    }
+
+    let processGas = OCTO_GAS_SN && OCTO_GAS_MPRN && OCTO_GAS_COST && VOLUME_CORRECTION && CALORIFIC_VALUE && JOULES_CONVERSION
+    if (processGas) {
+        console.log(`
         CALORIFIC_VALUE = ${CALORIFIC_VALUE}
         JOULES_CONVERSION = ${JOULES_CONVERSION}
-    `)
+        OCTO_GAS_COST = ${OCTO_GAS_COST}
+        OCTO_GAS_MPAN = ${OCTO_GAS_MPRN}
+        OCTO_GAS_SN = ${OCTO_GAS_SN}
+        VOLUME_CORRECTION = ${VOLUME_CORRECTION}
+        `)
+    } else {
+        console.log('Skipping processing gas, must set all variables: OCTO_GAS_SN, OCTO_GAS_MPRN, OCTO_GAS_COST, VOLUME_CORRECTION, CALORIFIC_VALUE, JOULES_CONVERSION')
+    }
 
 
 
@@ -69,10 +87,12 @@ const boot = async (callback) => {
             let options = {auth: {
                 username: OCTO_API_KEY
             }}
-            electricresponse = await axios.get(`https://api.octopus.energy/v1/electricity-meter-points/${OCTO_ELECTRIC_MPAN}/meters/${OCTO_ELECTRIC_SN}/consumption?page_size=${PAGE_SIZE}`, options)
-            gasresponse = await axios.get(`https://api.octopus.energy/v1/gas-meter-points/${OCTO_GAS_MPRN}/meters/${OCTO_GAS_SN}/consumption?page_size=${PAGE_SIZE}`, options)
-
-            
+            if (processElectric) {
+                electricresponse = await axios.get(`https://api.octopus.energy/v1/electricity-meter-points/${OCTO_ELECTRIC_MPAN}/meters/${OCTO_ELECTRIC_SN}/consumption?page_size=${PAGE_SIZE}`, options)
+            }
+            if (processGas) {
+                gasresponse = await axios.get(`https://api.octopus.energy/v1/gas-meter-points/${OCTO_GAS_MPRN}/meters/${OCTO_GAS_SN}/consumption?page_size=${PAGE_SIZE}`, options)
+            }
         } catch(e){
             console.log("Error retrieving data from octopus API")
             console.log(e)
@@ -80,52 +100,55 @@ const boot = async (callback) => {
 
         // Now we loop over every result given to us from the API and feed that into influxdb
 
-        for await ( obj of electricresponse.data.results) {
-            // Here we take the end interval, and convert it into nanoseconds for influxdb as nodejs works with ms, not ns
-            const ts = new Date(obj.interval_end)
-            const nanoDate = toNanoDate(String(ts.valueOf()) + '000000')
-            
-            // work out the consumption and hard set the datapoint's timestamp to the interval_end value from the API
-            let electricpoint = new Point('electricity')
-                .floatField('consumption', Number(obj.consumption))
-                .timestamp(nanoDate)
-            
-            // Same again but for cost mathmatics
-            let electriccost = Number(obj.consumption) * Number(OCTO_ELECTRIC_COST) / 100
-            let electriccostpoint = new Point('electricity_cost')
-                .floatField('price', electriccost)
-                .timestamp(nanoDate)
+        if (processElectric) {
+            for await ( obj of electricresponse.data.results) {
+                // Here we take the end interval, and convert it into nanoseconds for influxdb as nodejs works with ms, not ns
+                const ts = new Date(obj.interval_end)
+                const nanoDate = toNanoDate(String(ts.valueOf()) + '000000')
 
-            // and then write the points:
-            writeApi.writePoint(electricpoint)
-            writeApi.writePoint(electriccostpoint)
+                // work out the consumption and hard set the datapoint's timestamp to the interval_end value from the API
+                let electricpoint = new Point('electricity')
+                    .floatField('consumption', Number(obj.consumption))
+                    .timestamp(nanoDate)
+
+                // Same again but for cost mathmatics
+                let electriccost = Number(obj.consumption) * Number(OCTO_ELECTRIC_COST) / 100
+                let electriccostpoint = new Point('electricity_cost')
+                    .floatField('price', electriccost)
+                    .timestamp(nanoDate)
+
+                // and then write the points:
+                writeApi.writePoint(electricpoint)
+                writeApi.writePoint(electriccostpoint)
+            }
         }
 
         // Repeat the above but for gas
-        for await (obj of gasresponse.data.results) {
-            const ts = new Date(obj.interval_end)
-            const nanoDate = toNanoDate(String(ts.valueOf()) + '000000')
+        if (processGas) {
+            for await (obj of gasresponse.data.results) {
+                const ts = new Date(obj.interval_end)
+                const nanoDate = toNanoDate(String(ts.valueOf()) + '000000')
 
-            let gaspoint = new Point('gas')
-                .floatField('consumption', Number(obj.consumption))
+                let gaspoint = new Point('gas')
+                    .floatField('consumption', Number(obj.consumption))
+                    .timestamp(nanoDate)
+
+                let kilowatts = (Number(obj.consumption) * Number(VOLUME_CORRECTION) * Number(CALORIFIC_VALUE)) / Number(JOULES_CONVERSION)
+
+                let gaskwhpoint = new Point('gaskwh')
+                .floatField('consumption_kwh', Number(kilowatts))
                 .timestamp(nanoDate)
 
-            let kilowatts = (Number(obj.consumption) * Number(VOLUME_CORRECTION) * Number(CALORIFIC_VALUE)) / Number(JOULES_CONVERSION)
+                let gascost = Number(kilowatts) * Number(OCTO_GAS_COST) / 100
 
-            let gaskwhpoint = new Point('gaskwh')
-            .floatField('consumption_kwh', Number(kilowatts))
-            .timestamp(nanoDate)
-            
-            let gascost = Number(kilowatts) * Number(OCTO_GAS_COST) / 100
+                let gascostpoint = new Point('gas_cost')
+                    .floatField('price', gascost)
+                    .timestamp(nanoDate)
 
-            let gascostpoint = new Point('gas_cost')
-                .floatField('price', gascost)
-                .timestamp(nanoDate)
-
-            writeApi.writePoint(gaspoint)
-            writeApi.writePoint(gaskwhpoint)
-            writeApi.writePoint(gascostpoint)
-
+                writeApi.writePoint(gaspoint)
+                writeApi.writePoint(gaskwhpoint)
+                writeApi.writePoint(gascostpoint)
+            }
         }
 
         await writeApi
