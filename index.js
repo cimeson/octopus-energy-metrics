@@ -103,19 +103,33 @@ const boot = async (callback) => {
         // Now we loop over every result given to us from the API and feed that into influxdb
 
         if (processElectric) {
+            const unitPrice = Number(OCTO_ELECTRIC_COST) / 100
+            const dailyStandingCharge = Number(OCTO_ELECTRIC_STANDING_CHARGE) / 100
+
             for await ( obj of electricresponse.data.results) {
                 // Here we take the end interval, and convert it into nanoseconds for influxdb as nodejs works with ms, not ns
-                const ts = new Date(obj.interval_end)
-                const nanoDate = toNanoDate(String(ts.valueOf()) + '000000')
+                const intervalStart = new Date(obj.interval_start)
+                const intervalEnd = new Date(obj.interval_end)
+                const nanoDate = toNanoDate(String(intervalEnd.valueOf()) + '000000')
 
-                let electriccost = Number(obj.consumption) * Number(OCTO_ELECTRIC_COST) / 100
+                // now calculate the prorated amount for the interval from the daily standing charge
+                const dateDiff = Math.abs(intervalEnd - intervalStart)
+                const diffMinutes = Math.ceil(dateDiff / (1000 * 60))
+                const minutesPerDay = 60 * 24
+                const intervalStandingCharge = dailyStandingCharge * diffMinutes / minutesPerDay
+
+                // calculate interval consumption and price
+                const consumption = Number(obj.consumption)
+                const usageprice = consumption * unitPrice
 
                 // work out the consumption and hard set the datapoint's timestamp to the interval_end value from the API
                 let electricpoint = new Point('electricity')
-                    .floatField('consumption', Number(obj.consumption))
-                    .floatField('cost', OCTO_ELECTRIC_COST / 100)
-                    .floatField('price', electriccost)
-                    .floatField('standing_charge', OCTO_ELECTRIC_STANDING_CHARGE / 100)
+                    .floatField('consumption', consumption)
+                    .floatField('daily_standing_charge', dailyStandingCharge)
+                    .floatField('usageprice', usageprice)
+                    .floatField('standing_change', intervalStandingCharge)
+                    .floatField('unitprice', unitPrice)
+                    .floatField('totalprice', usageprice + intervalStandingCharge)
                     .timestamp(nanoDate)
 
                 // and then write the points:
