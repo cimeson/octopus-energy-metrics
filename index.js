@@ -24,6 +24,7 @@ const
     OCTO_ELECTRIC_COST = env.get('OCTO_ELECTRIC_COST').asString(),
     OCTO_ELECTRIC_MPAN = env.get('OCTO_ELECTRIC_MPAN').asString(),
     OCTO_ELECTRIC_SN = env.get('OCTO_ELECTRIC_SN').asString(),
+    OCTO_ELECTRIC_STANDING_CHARGE = env.get('OCTO_ELECTRIC_STANDING_CHARGE').asString(),
 
     CALORIFIC_VALUE = env.get('CALORIFIC_VALUE').asString(),
     JOULES_CONVERSION= env.get('JOULES_CONVERSION').asString(),
@@ -46,12 +47,13 @@ const boot = async (callback) => {
         PAGE_SIZE = ${PAGE_SIZE}
     `)
 
-    let processElectric = OCTO_ELECTRIC_MPAN && OCTO_ELECTRIC_SN && OCTO_ELECTRIC_COST
+    let processElectric = OCTO_ELECTRIC_MPAN && OCTO_ELECTRIC_SN && OCTO_ELECTRIC_COST && OCTO_ELECTRIC_STANDING_CHARGE
     if (processElectric) {
         console.log(`
         OCTO_ELECTRIC_COST = ${OCTO_ELECTRIC_COST}
         OCTO_ELECTRIC_MPAN = ${OCTO_ELECTRIC_MPAN}
         OCTO_ELECTRIC_SN = ${OCTO_ELECTRIC_SN}
+        OCTO_ELECTRIC_STANDING_CHARGE = ${OCTO_ELECTRIC_STANDING_CHARGE}
         `)
     } else {
         console.log('Skipping processing electric, must set all variables: OCTO_ELECTRIC_MPAN, OCTO_ELECTRIC_SN, OCTO_ELECTRIC_COST')
@@ -106,20 +108,18 @@ const boot = async (callback) => {
                 const ts = new Date(obj.interval_end)
                 const nanoDate = toNanoDate(String(ts.valueOf()) + '000000')
 
+                let electriccost = Number(obj.consumption) * Number(OCTO_ELECTRIC_COST) / 100
+
                 // work out the consumption and hard set the datapoint's timestamp to the interval_end value from the API
                 let electricpoint = new Point('electricity')
                     .floatField('consumption', Number(obj.consumption))
-                    .timestamp(nanoDate)
-
-                // Same again but for cost mathmatics
-                let electriccost = Number(obj.consumption) * Number(OCTO_ELECTRIC_COST) / 100
-                let electriccostpoint = new Point('electricity_cost')
+                    .floatField('cost', OCTO_ELECTRIC_COST / 100)
                     .floatField('price', electriccost)
+                    .floatField('standing_charge', OCTO_ELECTRIC_STANDING_CHARGE / 100)
                     .timestamp(nanoDate)
 
                 // and then write the points:
                 writeApi.writePoint(electricpoint)
-                writeApi.writePoint(electriccostpoint)
             }
         }
 
