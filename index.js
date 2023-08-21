@@ -75,7 +75,7 @@ const boot = async (callback) => {
 
 
 
-    while (true){
+    while (Number(LOOP_TIME)>0){
         // Set up influx client
         const client = new InfluxDB({url: INFLUXDB_URL, token: INFLUXDB_TOKEN})
         const writeApi = client.getWriteApi(INFLUXDB_ORG, INFLUXDB_BUCKET)
