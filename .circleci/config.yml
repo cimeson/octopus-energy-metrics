@@ -1,0 +1,23 @@
+version: 2.1
+
+orbs:
+  docker: circleci/docker@2.2.0
+
+jobs:
+  project-setup:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - setup_remote_docker
+      - checkout
+
+workflows:
+  build-and-push:
+    jobs:
+      - project-setup
+      - docker/publish:
+          context:
+            - docker
+          image: $DOCKER_USERNAME/octopus-energy-metrics
+          docker-password: DOCKER_PASSWORD
+          docker-username: DOCKER_USERNAME
