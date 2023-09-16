@@ -1,23 +1,26 @@
 version: 2.1
 
-orbs:
-  docker: circleci/docker@2.2.0
-
 jobs:
-  project-setup:
+  build-and-push:
     docker:
       - image: cimg/base:stable
+    resource_class: medium
     steps:
       - setup_remote_docker
       - checkout
+      - run:
+          command: docker buildx create --name multiarch --use
+          name: Setup multiarch buildx
+      - run:
+          command: echo $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin
+          name: Authenticate with Docker repo
+      - run:
+          command: docker buildx build --push --platform linux/arm64,linux/amd64 -t $DOCKER_USERNAME/wiserheatingapi:latest .
+          name: Build and push multiarch Docker image
 
 workflows:
   build-and-push:
     jobs:
-      - project-setup
-      - docker/publish:
+      - build-and-push:
           context:
             - docker
-          image: $DOCKER_USERNAME/octopus-energy-metrics
-          docker-password: DOCKER_PASSWORD
-          docker-username: DOCKER_USERNAME
