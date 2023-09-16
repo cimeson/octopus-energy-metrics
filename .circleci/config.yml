@@ -15,7 +15,7 @@ jobs:
           command: echo $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin
           name: Authenticate with Docker repo
       - run:
-          command: docker buildx build --push --platform linux/arm64,linux/amd64 -t $DOCKER_USERNAME/wiserheatingapi:latest .
+          command: docker buildx build --push --platform linux/arm64,linux/amd64 -t $DOCKER_USERNAME/$CIRCLE_PROJECT_REPONAME:latest .
           name: Build and push multiarch Docker image
 
 workflows:
