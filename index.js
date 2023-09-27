@@ -216,7 +216,7 @@ function findValueForDate(periods, searchDate) {
             const periodStart = new Date(period.valid_from)
             const periodEnd = new Date(period.valid_to ?? "2999-12-31")
             if ( searchDate >= periodStart && searchDate < periodEnd ) {
-                value = Number(period.value_inc_vat)
+                value = Number(period.value_inc_vat) / 100
                 break
             }
         }
