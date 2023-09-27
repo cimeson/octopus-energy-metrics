@@ -11,22 +11,9 @@ I was under the impression they polled it every 30 mins and the API would be "re
 https://www.guylipman.com/octopus/api_guide.html
 
 
-This was quite frustrating as I had originally planned to do this as a prometheus based exporter, but when the data isn't near realtime, it makes it very tricky to handle, instead I opted to feed the data into InfluxDB.
-
-This is because you can specify the timestamp of the data point when you write it into Influx, meaning that I can poll the API for "new" data every so often, and back load it into influx.
+This was quite frustrating as I had originally planned to do this as a prometheus based exporter, but when the data isn't near realtime, it makes it very tricky to handle, instead I opted to feed the data into InfluxDB. This is because you can specify the timestamp of the data point when you write it into Influx, meaning that I can poll the API for "new" data every so often, and back load it into influx.
 
 More information can be found on my blog [here](https://ainsey11.com/monitoring-my-energy-consumption-with-octopus-energy-grafana-influxdb-and-node-js/)
-
-## Requirements
-
-
-This can either be ran in docker or natively in a nodejs environment.
-You will need:
- - An Octopus Energy Account
- - An Octopus API Key
- - An SMETS1 or SMETS2 compatible smart meter, sending readings into Octopus (they must be visible in the octopus dashboard)
- - NodeJS installed or docker
- - An InfluxDB server running with a token generated and a bucket created
 
 ## Docker
 
@@ -41,24 +28,83 @@ To run the application, it takes certain variables to make it function. All of t
 
 ```
     OCTO_API_KEY = Your API Key from the dashboard
-    OCTO_ELECTRIC_SN = Your electric meter serial number
-    OCTO_ELECTRIC_MPAN = Your electric meter MPAN reference
-    OCTO_GAS_MPRN = Your gas meter MPRN reference
-    OCTO_GAS_SN = Your gas meter serial number
-    OCTO_ELECTRIC_COST = Your cost per KWH for electricity in pence
-    OCTO_GAS_COST = Your cost per KWH for gas in pence
     INFLUXDB_URL = the full url to your influddb server (https://influxdb.xxxx.xxxx)
     INFLUXDB_TOKEN = A token for influx with write access to your bucket
     INFLUXDB_ORG = the org in your influxdb server
     INFLUXDB_BUCKET = the bucket name for your metrics to be stored in, this must exist first
     LOOP_TIME = How often to poll the Octopus API in seconds
     PAGE_SIZE = How many data points to retrieve in one go, useful if you want to pull a large backload of data in for historical reasons, realistically this can be set to 48 (1 point every 30 mins in a 24 hour window) - maximum sizes are in the Octopus API docs
-    VOLUME_CORRECTION = 1.02264 = standard volume correction rate for gas
-    CALORIFIC_VALUE = 37.5 = standard calorific calue for gas
-    JOULES_CONVERSION = 3.6 = standard conversion divider to convert to joules for gas
-
 ```
-You can find the MPAN,MPRN and SN's of your devices in the Octopus dashboard
+
+| Environment Variable              | Group       | Optional/Required  | Description |
+|-----------------------------------|-------------|--------------------|-------------|
+| OCTO_ELECTRIC_MPAN                | Electricity | Required for Group | Your electric meter MPAN reference |
+| OCTO_ELECTRIC_SN                  | Electricity | Required for Group | Your electric meter serial number |
+| OCTO_ELECTRIC_COST                | Electricity | Required for Group | Your cost per KWH for electricity in pence |
+| OCTO_ELECTRIC_STANDING_CHARGE     | Electricity | Required for Group |
+| OCTO_ELECTRIC_STANDING_CHARGE_URL | Electricity | Optional           |
+| OCTO_ELECTRIC_UNIT_RATE_URL       | Electricity | Optional           |
+| OCTO_GAS_SN                       | Gas         | Required for Group | Your gas meter serial number |
+| OCTO_GAS_MPRN                     | Gas         | Required for Group | Your gas meter MPRN reference |
+| OCTO_GAS_COST                     | Gas         | Required for Group | Your cost per KWH for gas in pence |
+| VOLUME_CORRECTION                 | Gas         | Required for Group | 1.02264 = standard volume correction rate for gas |
+| CALORIFIC_VALUE                   | Gas         | Required for Group | 37.5 = standard calorific calue for gas |
+| JOULES_CONVERSION                 | Gas         | Required for Group | 3.6 = standard conversion divider to convert to joules for gas |
+
+* You can find the MPAN,MPRN and SN's of your devices in the Octopus dashboard.
+* You can find standing charge and unit rate URLs for your Octopus products by navigating the Products API.
+
+## Changes in forked development
+
+This fork of the project extends the project purely for my own needs. Focusing on electricity only, since I don't have a gas supply.
+
+* Restructure recording of data points so that reporting on costing is more easily achieved. I have not pushed the fork upstream as this change will likely break existing reporting.
+* Standing charges are now included (these are prorated to each data point interval).
+* Unit prices and standing charges can either be set as environment variables, or read from the Octopus Energy API.
+* If the pricing API doesn't return a price for the period, then the environment variables are used as a default.
+* Environment variables are now optional: leave out gas configuration to not read gas meter consumption from the API, and similarly for electricity (untested).
+
+### Data Structure
+Previously, seperate points were stored for the `electricity` and `electricity_cost` metrics.
+
+Now, we have a single data point that includes the metrics for:
+* `consumption` - number of units consumed in the period (30 minutes)
+* `daily_standing_charge` - daily standing charge at the time of the datapoint
+* `standing_charge` - prorated standing charge for the period (usually, daily charge divided by 48)
+* `totalprice` = `usageprice` + `standing_charge`
+* `unitprice` - this unit price at the time of the datapoint
+* `usageprice` = `unitprice` x `consumption`
+
+Gas data recording is currently unchanged, as I do not have a gas supply to test this.
+
+### Standing Charges
+```bash
+# Your daily electric standing charge
+OCTO_ELECTRIC_STANDING_CHARGE=0.61
+```
+### Dynamically using electricity prices from Octopus APIs (optional)
+Configure the following environment variables to dynamically read current prices for your electricity plan from the API. If the a pricing period for the data point being recorded can't be determined, or these URLs are not specified, then it will fall back to the values specified by environment variables `OCTO_ELECTRIC_STANDING_CHARGE` and `OCTO_ELECTRIC_COST`.
+
+```bash
+# The URL to fetch standing charges for your electricity plan
+OCTO_ELECTRIC_STANDING_CHARGE_URL=https://api.octopus.energy/v1/products/{product}/electricity-tariffs/{product_variant}/standing-charges/
+
+# The URL to fetch unit rates for your eletricity plan
+OCTO_ELECTRIC_UNIT_RATE_URL=https://api.octopus.energy/v1/products/{product}/electricity-tariffs/{product_variant}/standard-unit-rates/
+```
+
+I have not yet found a way of determining which Octopus product is active for an account, so this requires some digging to find. The starting point for working out the URL for the product you are using is https://api.octopus.energy/v1/products/.
+
+### Independent Electricity / Gas Reading
+Not all environment variables are required, when required variables are not all set for a group, then readings for that group will be disabled.
+
+## Requirements
 
 
-## Discord Server to aid discussions for my projects: [https://discord.gg/VWNXq4Em]
+This can either be ran in docker or natively in a nodejs environment.
+You will need:
+ - An Octopus Energy Account
+ - An Octopus API Key
+ - An SMETS1 or SMETS2 compatible smart meter, sending readings into Octopus (they must be visible in the octopus dashboard)
+ - NodeJS installed or docker
+ - An InfluxDB server running with a token generated and a bucket created

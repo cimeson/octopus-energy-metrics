@@ -25,6 +25,8 @@ const
     OCTO_ELECTRIC_MPAN = env.get('OCTO_ELECTRIC_MPAN').asString(),
     OCTO_ELECTRIC_SN = env.get('OCTO_ELECTRIC_SN').asString(),
     OCTO_ELECTRIC_STANDING_CHARGE = env.get('OCTO_ELECTRIC_STANDING_CHARGE').asString(),
+    OCTO_ELECTRIC_STANDING_CHARGE_URL = env.get('OCTO_ELECTRIC_STANDING_CHARGE_URL').asString(),
+    OCTO_ELECTRIC_UNIT_RATE_URL = env.get('OCTO_ELECTRIC_UNIT_RATE_URL').asString(),
 
     CALORIFIC_VALUE = env.get('CALORIFIC_VALUE').asString(),
     JOULES_CONVERSION= env.get('JOULES_CONVERSION').asString(),
@@ -83,14 +85,23 @@ const boot = async (callback) => {
         console.log("Polling data from octopus API")
 
         // Retrieve data from octopus API
-        let electricresponse = null;
-        let gasresponse = null;
+        let electricresponse = null
+        let electricStandingChargeResponse = null
+        let electricUnitPriceResponse = null
+        let gasresponse = null
+
         try{
             let options = {auth: {
                 username: OCTO_API_KEY
             }}
             if (processElectric) {
                 electricresponse = await axios.get(`https://api.octopus.energy/v1/electricity-meter-points/${OCTO_ELECTRIC_MPAN}/meters/${OCTO_ELECTRIC_SN}/consumption?page_size=${PAGE_SIZE}`, options)
+                if (OCTO_ELECTRIC_STANDING_CHARGE_URL) {
+                    electricStandingChargeResponse = await axios.get(OCTO_ELECTRIC_STANDING_CHARGE_URL, options)
+                }
+                if (OCTO_ELECTRIC_UNIT_RATE_URL) {
+                    electricUnitPriceResponse = await axios.get(OCTO_ELECTRIC_UNIT_RATE_URL, options)
+                }
             }
             if (processGas) {
                 gasresponse = await axios.get(`https://api.octopus.energy/v1/gas-meter-points/${OCTO_GAS_MPRN}/meters/${OCTO_GAS_SN}/consumption?page_size=${PAGE_SIZE}`, options)
@@ -103,14 +114,31 @@ const boot = async (callback) => {
         // Now we loop over every result given to us from the API and feed that into influxdb
 
         if (processElectric) {
-            const unitPrice = Number(OCTO_ELECTRIC_COST) / 100
-            const dailyStandingCharge = Number(OCTO_ELECTRIC_STANDING_CHARGE) / 100
+            const defaultUnitPrice = Number(OCTO_ELECTRIC_COST) / 100
+            const defaultDailyStandingCharge = Number(OCTO_ELECTRIC_STANDING_CHARGE) / 100
+
+            const electricStandingChargeResults = electricStandingChargeResponse ? await electricStandingChargeResponse.data.results : null
+            const electricUnitPriceResults = electricUnitPriceResponse ? await electricUnitPriceResponse.data.results : null
 
             for await ( obj of electricresponse.data.results) {
                 // Here we take the end interval, and convert it into nanoseconds for influxdb as nodejs works with ms, not ns
                 const intervalStart = new Date(obj.interval_start)
                 const intervalEnd = new Date(obj.interval_end)
                 const nanoDate = toNanoDate(String(intervalEnd.valueOf()) + '000000')
+
+                // find relevant standing charge value for period
+                let standingChargeValue = null
+                if (electricStandingChargeResults) {
+                    standingChargeValue = findValueForDate(electricStandingChargeResults, intervalEnd)
+                }
+                const dailyStandingCharge = standingChargeValue ?? defaultDailyStandingCharge
+
+                // find relevant unit price value for period
+                let unitPriceValue = null
+                if (electricUnitPriceResults) {
+                    unitPriceValue = findValueForDate(electricUnitPriceResults, intervalEnd)
+                }
+                const unitPrice = unitPriceValue ?? defaultUnitPrice
 
                 // now calculate the prorated amount for the interval from the daily standing charge
                 const dateDiff = Math.abs(intervalEnd - intervalStart)
@@ -179,6 +207,21 @@ const boot = async (callback) => {
         console.log("Sleeping for: " + LOOP_TIME)
         sleep(Number(LOOP_TIME))
     } while (Number(LOOP_TIME)>0)
+}
+
+function findValueForDate(periods, searchDate) {
+    let value = null
+    for ( period of periods ) {
+        if (period.payment_method == "DIRECT_DEBIT") {
+            const periodStart = new Date(period.valid_from)
+            const periodEnd = new Date(period.valid_to ?? "2999-12-31")
+            if ( searchDate >= periodStart && searchDate < periodEnd ) {
+                value = Number(period.value_inc_vat)
+                break
+            }
+        }
+    }
+    return value
 }
 
 boot((error) => {

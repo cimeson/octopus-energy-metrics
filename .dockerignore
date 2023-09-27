@@ -1,4 +1,6 @@
+.circleci/
 .env
 .env.example
 .git/
 .github/
+node_modules/
