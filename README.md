@@ -26,24 +26,21 @@ rename the `.env.example` file to `.env` and edit the values in the `.env` file 
 ## Environment Variables
 To run the application, it takes certain variables to make it function. All of these variables are mandatory for the code to work.
 
-```
-    OCTO_API_KEY = Your API Key from the dashboard
-    INFLUXDB_URL = the full url to your influddb server (https://influxdb.xxxx.xxxx)
-    INFLUXDB_TOKEN = A token for influx with write access to your bucket
-    INFLUXDB_ORG = the org in your influxdb server
-    INFLUXDB_BUCKET = the bucket name for your metrics to be stored in, this must exist first
-    LOOP_TIME = How often to poll the Octopus API in seconds
-    PAGE_SIZE = How many data points to retrieve in one go, useful if you want to pull a large backload of data in for historical reasons, realistically this can be set to 48 (1 point every 30 mins in a 24 hour window) - maximum sizes are in the Octopus API docs
-```
-
 | Environment Variable              | Group       | Optional/Required  | Description |
 |-----------------------------------|-------------|--------------------|-------------|
+| LOOP_TIME                         | App         | Required           | How often to poll the Octopus API in seconds |
+| PAGE_SIZE                         | App         | Required           | How many data points to retrieve in one go, useful if you want to pull a large backload of data in for historical reasons, realistically this can be set to 48 (1 point every 30 mins in a 24 hour window) - maximum sizes are in the Octopus API docs |
+| INFLUXDB_URL                      | InfluxDB    | Required           | the full url to your influddb server (https://influxdb.xxxx.xxxx) |
+| INFLUXDB_TOKEN                    | InfluxDB    | Required           | A token for influx with write access to your bucket |
+| INFLUXDB_ORG                      | InfluxDB    | Required           | the org in your influxdb server |
+| INFLUXDB_BUCKET                   | InfluxDB    | Required           | the bucket name for your metrics to be stored in, this must exist first |
+| OCTO_API_KEY                      | Octopus API | Required           | Your API Key from the dashboard |
 | OCTO_ELECTRIC_MPAN                | Electricity | Required for Group | Your electric meter MPAN reference |
 | OCTO_ELECTRIC_SN                  | Electricity | Required for Group | Your electric meter serial number |
 | OCTO_ELECTRIC_COST                | Electricity | Required for Group | Your cost per KWH for electricity in pence |
-| OCTO_ELECTRIC_STANDING_CHARGE     | Electricity | Required for Group |
-| OCTO_ELECTRIC_STANDING_CHARGE_URL | Electricity | Optional           |
-| OCTO_ELECTRIC_UNIT_RATE_URL       | Electricity | Optional           |
+| OCTO_ELECTRIC_STANDING_CHARGE     | Electricity | Required for Group | Daily standing charge for electricity |
+| OCTO_ELECTRIC_STANDING_CHARGE_URL | Electricity | Optional           | API URL for Octopus product standing charge API |
+| OCTO_ELECTRIC_UNIT_RATE_URL       | Electricity | Optional           | API URL for Octopus product unit change API |
 | OCTO_GAS_SN                       | Gas         | Required for Group | Your gas meter serial number |
 | OCTO_GAS_MPRN                     | Gas         | Required for Group | Your gas meter MPRN reference |
 | OCTO_GAS_COST                     | Gas         | Required for Group | Your cost per KWH for gas in pence |
