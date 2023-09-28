@@ -23,10 +23,9 @@ const
 
     OCTO_ELECTRIC_COST = env.get('OCTO_ELECTRIC_COST').asString(),
     OCTO_ELECTRIC_MPAN = env.get('OCTO_ELECTRIC_MPAN').asString(),
+    OCTO_ELECTRIC_PRODUCT_CODE = env.get('OCTO_ELECTRIC_PRODUCT_CODE').asString(),
     OCTO_ELECTRIC_SN = env.get('OCTO_ELECTRIC_SN').asString(),
     OCTO_ELECTRIC_STANDING_CHARGE = env.get('OCTO_ELECTRIC_STANDING_CHARGE').asString(),
-    OCTO_ELECTRIC_STANDING_CHARGE_URL = env.get('OCTO_ELECTRIC_STANDING_CHARGE_URL').asString(),
-    OCTO_ELECTRIC_UNIT_RATE_URL = env.get('OCTO_ELECTRIC_UNIT_RATE_URL').asString(),
 
     CALORIFIC_VALUE = env.get('CALORIFIC_VALUE').asString(),
     JOULES_CONVERSION= env.get('JOULES_CONVERSION').asString(),
@@ -54,6 +53,7 @@ const boot = async (callback) => {
         console.log(`
         OCTO_ELECTRIC_COST = ${OCTO_ELECTRIC_COST}
         OCTO_ELECTRIC_MPAN = ${OCTO_ELECTRIC_MPAN}
+        OCTO_ELECTRIC_PRODUCT_CODE = ${OCTO_ELECTRIC_PRODUCT_CODE}
         OCTO_ELECTRIC_SN = ${OCTO_ELECTRIC_SN}
         OCTO_ELECTRIC_STANDING_CHARGE = ${OCTO_ELECTRIC_STANDING_CHARGE}
         `)
@@ -86,6 +86,8 @@ const boot = async (callback) => {
 
         // Retrieve data from octopus API
         let electricresponse = null
+        let electricMeterPointResponse = null
+        let electricProductResponse = null
         let electricStandingChargeResponse = null
         let electricUnitPriceResponse = null
         let gasresponse = null
@@ -96,11 +98,26 @@ const boot = async (callback) => {
             }}
             if (processElectric) {
                 electricresponse = await axios.get(`https://api.octopus.energy/v1/electricity-meter-points/${OCTO_ELECTRIC_MPAN}/meters/${OCTO_ELECTRIC_SN}/consumption?page_size=${PAGE_SIZE}`, options)
-                if (OCTO_ELECTRIC_STANDING_CHARGE_URL) {
-                    electricStandingChargeResponse = await axios.get(OCTO_ELECTRIC_STANDING_CHARGE_URL, options)
-                }
-                if (OCTO_ELECTRIC_UNIT_RATE_URL) {
-                    electricUnitPriceResponse = await axios.get(OCTO_ELECTRIC_UNIT_RATE_URL, options)
+                if (OCTO_ELECTRIC_PRODUCT_CODE) {
+                    electricMeterPointResponse = await axios.get(`https://api.octopus.energy/v1/electricity-meter-points/${OCTO_ELECTRIC_MPAN}/`, options)
+                    electricProductResponse = await axios.get(`https://api.octopus.energy/v1/products/${OCTO_ELECTRIC_PRODUCT_CODE}/`, options)
+
+                    const gsp = await electricMeterPointResponse.data.gsp
+                    full_name = await electricProductResponse.data.full_name
+                    console.log(`found electricity product product_code=${OCTO_ELECTRIC_PRODUCT_CODE}, full_name=${full_name}`)
+                    console.log(`found electricity gsp=${gsp} for mpan=${OCTO_ELECTRIC_MPAN}`)
+                    for await ( obj of electricProductResponse.data.single_register_electricity_tariffs[gsp].varying.links) {
+                        switch(obj.rel) {
+                            case "standing_charges":
+                                electricStandingChargeResponse = await axios.get(obj.href, options)
+                                console.log(`found electricStandingChargeUrl=${obj.href}`)
+                                break
+                            case "standard_unit_rates":
+                                electricUnitPriceResponse = await axios.get(obj.href, options)
+                                console.log(`found electricUnitPriceUrl=${obj.href}`)
+                                break
+                        }
+                    }
                 }
             }
             if (processGas) {

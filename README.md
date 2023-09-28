@@ -38,9 +38,8 @@ To run the application, it takes certain variables to make it function. All of t
 | OCTO_ELECTRIC_MPAN                | Electricity | Required for Group | Your electric meter MPAN reference |
 | OCTO_ELECTRIC_SN                  | Electricity | Required for Group | Your electric meter serial number |
 | OCTO_ELECTRIC_COST                | Electricity | Required for Group | Your cost per KWH for electricity in pence |
+| OCTO_ELECTRIC_PRODUCT_CODE        | Electricity | Optional           | Your electric product code, used to dynamically query variable unit cost and standing charge |
 | OCTO_ELECTRIC_STANDING_CHARGE     | Electricity | Required for Group | Daily standing charge for electricity |
-| OCTO_ELECTRIC_STANDING_CHARGE_URL | Electricity | Optional           | API URL for Octopus product standing charge API |
-| OCTO_ELECTRIC_UNIT_RATE_URL       | Electricity | Optional           | API URL for Octopus product unit change API |
 | OCTO_GAS_SN                       | Gas         | Required for Group | Your gas meter serial number |
 | OCTO_GAS_MPRN                     | Gas         | Required for Group | Your gas meter MPRN reference |
 | OCTO_GAS_COST                     | Gas         | Required for Group | Your cost per KWH for gas in pence |
@@ -48,8 +47,8 @@ To run the application, it takes certain variables to make it function. All of t
 | CALORIFIC_VALUE                   | Gas         | Required for Group | 37.5 = standard calorific calue for gas |
 | JOULES_CONVERSION                 | Gas         | Required for Group | 3.6 = standard conversion divider to convert to joules for gas |
 
-* You can find the MPAN,MPRN and SN's of your devices in the Octopus dashboard.
-* You can find standing charge and unit rate URLs for your Octopus products by navigating the Products API.
+* You can find the MPAN, MPRN and SN's of your devices in the Octopus dashboard.
+* You can find your Octopus Product Code by navigating the Products API.
 
 ## Changes in forked development
 
@@ -80,14 +79,11 @@ Gas data recording is currently unchanged, as I do not have a gas supply to test
 OCTO_ELECTRIC_STANDING_CHARGE=0.61
 ```
 ### Dynamically using electricity prices from Octopus APIs (optional)
-Configure the following environment variables to dynamically read current prices for your electricity plan from the API. If the a pricing period for the data point being recorded can't be determined, or these URLs are not specified, then it will fall back to the values specified by environment variables `OCTO_ELECTRIC_STANDING_CHARGE` and `OCTO_ELECTRIC_COST`.
+Configure the following the product code for your electricity plan to dynamically read current prices from the API. If the a pricing period for the data point being recorded can't be determined, or these product code is not specified, then it will fall back to the values specified by environment variables `OCTO_ELECTRIC_STANDING_CHARGE` and `OCTO_ELECTRIC_COST`.
 
 ```bash
-# The URL to fetch standing charges for your electricity plan
-OCTO_ELECTRIC_STANDING_CHARGE_URL=https://api.octopus.energy/v1/products/{product}/electricity-tariffs/{product_variant}/standing-charges/
-
-# The URL to fetch unit rates for your eletricity plan
-OCTO_ELECTRIC_UNIT_RATE_URL=https://api.octopus.energy/v1/products/{product}/electricity-tariffs/{product_variant}/standard-unit-rates/
+# The product code for your electricity agreement
+OCTO_ELECTRIC_PRODUCT_CODE={product_code}
 ```
 
 I have not yet found a way of determining which Octopus product is active for an account, so this requires some digging to find. The starting point for working out the URL for the product you are using is https://api.octopus.energy/v1/products/.
