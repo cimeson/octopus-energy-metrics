@@ -56,7 +56,7 @@ This fork of the project extends the project purely for my own needs. Focusing o
 
 * Restructure recording of data points so that reporting on costing is more easily achieved. I have not pushed the fork upstream as this change will likely break existing reporting.
 * Standing charges are now included (these are prorated to each data point interval).
-* Unit prices and standing charges can either be set as environment variables, or read from the Octopus Energy API.
+* Unit prices and standing charges can either be set as environment variables, or read from the Octopus Energy API based on specified product code.
 * If the pricing API doesn't return a price for the period, then the environment variables are used as a default.
 * Environment variables are now optional: leave out gas configuration to not read gas meter consumption from the API, and similarly for electricity (untested).
 
