@@ -1,6 +1,14 @@
 version: 2.1
 
 jobs:
+  test:
+    docker:
+      - image: node:26.12.1
+    steps:
+      - checkout
+      - run: npm ci
+      - run: npm test
+
   build-and-push:
     docker:
       - image: cimg/base:stable
@@ -21,6 +29,12 @@ jobs:
 workflows:
   build-and-push:
     jobs:
+      - test
       - build-and-push:
+          requires:
+            - test
+          filters:
+            branches:
+              only: master
           context:
             - docker
